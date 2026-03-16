@@ -1,6 +1,7 @@
 'use client';
 
 import { UPN_CATALOG } from '@/data/upn_catalog';
+import { ANGULOS_CATALOG } from '@/data/angulos_catalog';
 import type { ColumnInputs } from '@/types';
 
 interface SidebarProps {
@@ -11,10 +12,10 @@ interface SidebarProps {
 
 const TIPOLOGIAS = [
   { id: 'empresillada', label: 'Empresillada (UPN)', active: true },
-  { id: 'celosia_simple', label: 'Celosía Simple', active: false },
-  { id: 'celosia_doble', label: 'Celosía Doble', active: false },
+  { id: 'celosia',      label: 'Celosía (Barras diag.)', active: true },
   { id: 'perfiles_contacto', label: 'Perfiles en Contacto', active: false },
-  { id: 'chapas_continuas', label: 'Chapas de Continuidad', active: false },
+  { id: 'cajón',        label: 'Cajón (Box Section)', active: false },
+  { id: 'chapas_continuas', label: 'Chapas Continuas', active: false },
 ];
 
 const K_PRESETS = [
@@ -61,6 +62,8 @@ function InputRow({
 
 export default function Sidebar({ inputs, onChange, onCalculate }: SidebarProps) {
   const selectedProfile = inputs.profile;
+  const selectedAngulo = inputs.angulo_lacing ?? ANGULOS_CATALOG[9]; // L 60×60×6 default
+  const isCelosia = inputs.tipologia === 'celosia';
 
   const set = <K extends keyof ColumnInputs>(key: K, value: ColumnInputs[K]) =>
     onChange({ ...inputs, [key]: value });
@@ -75,7 +78,9 @@ export default function Sidebar({ inputs, onChange, onCalculate }: SidebarProps)
         <div className="text-sm font-bold text-white mt-0.5">
           Columnas Armadas
         </div>
-        <div className="text-xs text-slate-500 mono mt-0.5">v1.0 · Fase 1: Empresilladas</div>
+        <div className="text-xs text-slate-500 mono mt-0.5">
+          v1.1 · Grupos IV + V: Celosía + Empresillada
+        </div>
       </div>
 
       <div className="flex-1 overflow-y-auto px-3 py-2 space-y-3">
@@ -105,9 +110,9 @@ export default function Sidebar({ inputs, onChange, onCalculate }: SidebarProps)
           </div>
         </div>
 
-        {/* Perfil UPN */}
+        {/* Perfil UPN — siempre visible (cordones) */}
         <div>
-          <SectionLabel>Perfil UPN</SectionLabel>
+          <SectionLabel>{isCelosia ? 'Cordones (UPN)' : 'Perfil UPN'}</SectionLabel>
           <InputRow label="Perfil">
             <select
               className="input-blueprint"
@@ -124,7 +129,6 @@ export default function Sidebar({ inputs, onChange, onCalculate }: SidebarProps)
               ))}
             </select>
           </InputRow>
-          {/* Propiedades del perfil seleccionado */}
           <div className="bg-slate-800/50 rounded p-2 mt-1 grid grid-cols-2 gap-x-3 gap-y-0.5">
             {[
               ['h', `${selectedProfile.h} mm`],
@@ -143,6 +147,52 @@ export default function Sidebar({ inputs, onChange, onCalculate }: SidebarProps)
             ))}
           </div>
         </div>
+
+        {/* Barras de Celosía — sólo visible en modo celosía */}
+        {isCelosia && (
+          <div>
+            <SectionLabel>Barra de Celosía</SectionLabel>
+            <InputRow label="Tipo celosía">
+              <select
+                className="input-blueprint"
+                value={inputs.celosia_tipo ?? 'simple'}
+                onChange={(e) => set('celosia_tipo', e.target.value as 'simple' | 'doble')}
+              >
+                <option value="simple">Simple (θ ≥ 60°)</option>
+                <option value="doble">Doble / Cruz (θ ≥ 45°)</option>
+              </select>
+            </InputRow>
+            <InputRow label="Ángulo">
+              <select
+                className="input-blueprint"
+                value={selectedAngulo.designation}
+                onChange={(e) => {
+                  const ang = ANGULOS_CATALOG.find(p => p.designation === e.target.value);
+                  if (ang) set('angulo_lacing', ang);
+                }}
+              >
+                {ANGULOS_CATALOG.map((p) => (
+                  <option key={p.designation} value={p.designation}>
+                    {p.designation}
+                  </option>
+                ))}
+              </select>
+            </InputRow>
+            <div className="bg-slate-800/50 rounded p-2 mt-1 grid grid-cols-2 gap-x-3 gap-y-0.5">
+              {[
+                ['A', `${selectedAngulo.A} cm²`],
+                ['iz (i_min)', `${selectedAngulo.iz} cm`],
+                ['iy', `${selectedAngulo.iy} cm`],
+                ['e', `${selectedAngulo.e} cm`],
+              ].map(([k, v]) => (
+                <div key={k} className="flex justify-between">
+                  <span className="text-slate-500 text-xs mono">{k}</span>
+                  <span className="text-slate-300 text-xs mono">{v}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Geometría */}
         <div>
@@ -167,7 +217,7 @@ export default function Sidebar({ inputs, onChange, onCalculate }: SidebarProps)
               onChange={(e) => set('h_sep', parseFloat(e.target.value) || 0)}
             />
           </InputRow>
-          <InputRow label="Sep. presillas a" unit="mm">
+          <InputRow label={isCelosia ? 'Panel a (celosía)' : 'Sep. presillas a'} unit="mm">
             <input
               type="number"
               className="input-blueprint"

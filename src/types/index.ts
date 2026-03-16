@@ -3,6 +3,9 @@
 // Tipos e interfaces - CIRSOC 301-2018 / AISC 360-16
 // ============================================================
 
+import type { AnguloProfile } from '@/data/angulos_catalog';
+export type { AnguloProfile };
+
 export interface UPNProfile {
   designation: string;  // "UPN 100"
   h: number;            // altura total mm
@@ -20,11 +23,11 @@ export interface UPNProfile {
 }
 
 export type TipologiaColumna =
-  | 'empresillada'      // Fase 1 - implementada
-  | 'celosia_simple'    // Fase 2
-  | 'celosia_doble'     // Fase 3
-  | 'perfiles_contacto' // Fase 4
-  | 'chapas_continuas'; // Fase 5
+  | 'empresillada'      // Grupo V - implementada
+  | 'celosia'           // Grupo IV - implementada
+  | 'perfiles_contacto' // Grupo I - próxima
+  | 'cajón'             // Grupo III - próxima
+  | 'chapas_continuas'; // Grupo II - próxima
 
 export type TipoConexion = 'bulones' | 'soldadura';
 
@@ -33,7 +36,7 @@ export interface ColumnInputs {
   profile: UPNProfile;
   L: number;            // longitud de la columna m
   h_sep: number;        // separación entre caras exteriores de almas (back-to-back) mm
-  a: number;            // separación entre presillas mm
+  a: number;            // separación entre presillas / panel de celosía mm
   K: number;            // factor de longitud efectiva
   conexion: TipoConexion;
   Fy: number;           // tensión de fluencia MPa
@@ -42,6 +45,9 @@ export interface ColumnInputs {
   Pu: number;           // carga axial mayorada kN
   Vu: number;           // corte mayorado kN
   Mu: number;           // momento mayorado kNm
+  // Celosía (Grupo IV) — campos opcionales
+  celosia_tipo?: 'simple' | 'doble';   // celosía simple o doble
+  angulo_lacing?: AnguloProfile;        // perfil de la barra de celosía
 }
 
 export interface SectionProperties {
@@ -89,6 +95,24 @@ export interface BattenResults {
   passes: boolean;
 }
 
+export interface LacingResults {
+  h_0: number;             // distancia entre líneas de centroide de cordones mm
+  theta_deg: number;       // ángulo de inclinación desde horizontal °
+  l_d: number;             // longitud de barra diagonal mm
+  KL_lacing: number;       // longitud efectiva de barra mm (l_d simple, 0.7×l_d doble)
+  r_lacing: number;        // radio de giro mínimo de la barra cm (iz del ángulo)
+  KLr_lacing: number;      // esbeltez de la barra de celosía
+  N_d: number;             // fuerza axial de diseño en la barra kN
+  Fe_lacing: number;       // tensión de Euler para barra MPa
+  Fcr_lacing: number;      // tensión crítica de barra MPa
+  Pn_lacing: number;       // resistencia nominal de barra kN
+  phi_Pn_lacing: number;   // resistencia de diseño de barra kN (φ=0.85)
+  DCR_lacing: number;      // relación demanda/capacidad de barra
+  passes_slenderness: boolean; // KLr_lacing ≤ 140
+  passes_strength: boolean;
+  passes: boolean;
+}
+
 export interface CalculationStep {
   title: string;
   article: string;
@@ -106,6 +130,7 @@ export interface CalculationResults {
   slenderness: SlendernessResults;
   strength: StrengthResults;
   battens: BattenResults;
+  lacing?: LacingResults;   // Grupo IV — celosía
   steps: CalculationStep[];
   errors: string[];
   warnings: string[];

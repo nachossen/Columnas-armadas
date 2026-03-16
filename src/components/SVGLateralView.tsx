@@ -1,13 +1,15 @@
 'use client';
 
-import type { ColumnInputs } from '@/types';
+import type { ColumnInputs, LacingResults } from '@/types';
 
 interface SVGLateralViewProps {
   inputs: ColumnInputs;
+  lacing?: LacingResults;
 }
 
-export default function SVGLateralView({ inputs }: SVGLateralViewProps) {
-  const { L, a, h_sep, profile } = inputs;
+export default function SVGLateralView({ inputs, lacing }: SVGLateralViewProps) {
+  const { L, a, h_sep, profile, tipologia, celosia_tipo } = inputs;
+  const isCelosia = tipologia === 'celosia';
   const svgW = 200;
   const svgH = 320;
 
@@ -20,33 +22,59 @@ export default function SVGLateralView({ inputs }: SVGLateralViewProps) {
   const colW_px = Math.max((h_sep + 2 * profile.tw) * scale * 3, 40);
   const colCx = marginLeft + colW_px / 2;
 
-  // Posición y dimensiones de la columna
   const colTop = marginTop;
   const colBot = marginTop + colH_px;
   const halfW = colW_px / 2;
 
-  // Presillas: ubicadas cada 'a' mm desde el tope
   const a_px = a * scale;
-  const n_battens = Math.max(0, Math.floor((L * 1000) / a) - 1);
-  const battenH_px = Math.max(4, 6); // altura de presilla en px
-  const battenW_px = colW_px + 4;
+  const n_panels = Math.max(1, Math.floor((L * 1000) / a));
 
+  const steel = '#93c5fd';
+  const dim = '#f59e0b';
+  const batten_color = '#60a5fa';
+  const lace_color = '#a78bfa'; // purple for lacing diagonals
+  const bg = '#0f172a';
+  const grid = 'rgba(59,130,246,0.08)';
+  const axis = '#34d399';
+
+  // ── Battenned: horizontal plates ──
+  const battenH_px = Math.max(4, 6);
+  const battenW_px = colW_px + 4;
+  const n_battens = Math.max(0, Math.floor((L * 1000) / a) - 1);
   const battens: number[] = [];
   for (let i = 1; i <= n_battens; i++) {
     battens.push(colTop + i * a_px);
   }
 
-  const steel = '#93c5fd';
-  const dim = '#f59e0b';
-  const batten_color = '#60a5fa';
-  const bg = '#0f172a';
-  const grid = 'rgba(59,130,246,0.08)';
-  const axis = '#34d399';
+  // ── Laced: diagonal bars ──
+  // Each panel goes from y_top to y_top + a_px, alternating left→right and right→left
+  // For double lacing: both diagonals in each panel
+  const lacingLines: { x1: number; y1: number; x2: number; y2: number }[] = [];
+  if (isCelosia) {
+    const xLeft = colCx - halfW;
+    const xRight = colCx + halfW;
+    for (let i = 0; i < n_panels; i++) {
+      const yTop = colTop + i * a_px;
+      const yBot = Math.min(colTop + (i + 1) * a_px, colBot);
+      if (celosia_tipo === 'doble') {
+        // Both diagonals
+        lacingLines.push({ x1: xLeft, y1: yTop, x2: xRight, y2: yBot });
+        lacingLines.push({ x1: xRight, y1: yTop, x2: xLeft, y2: yBot });
+      } else {
+        // Alternating: even panels go left-to-right, odd panels go right-to-left
+        if (i % 2 === 0) {
+          lacingLines.push({ x1: xLeft, y1: yTop, x2: xRight, y2: yBot });
+        } else {
+          lacingLines.push({ x1: xRight, y1: yTop, x2: xLeft, y2: yBot });
+        }
+      }
+    }
+  }
 
   return (
     <div className="flex flex-col items-center">
       <div className="text-xs text-slate-400 font-semibold tracking-wider uppercase mb-1">
-        Vista Lateral — Elevación
+        Vista Lateral — {isCelosia ? `Celosía ${celosia_tipo ?? 'simple'}` : 'Empresillada'}
       </div>
       <svg
         width={svgW}
@@ -83,8 +111,20 @@ export default function SVGLateralView({ inputs }: SVGLateralViewProps) {
           fill={steel} fillOpacity="0.2" stroke={steel} strokeWidth="1.5"
         />
 
-        {/* Placas de presilla */}
-        {battens.map((by, i) => (
+        {/* BARRAS DE CELOSÍA — diagonales */}
+        {isCelosia && lacingLines.map((ln, i) => (
+          <line
+            key={i}
+            x1={ln.x1} y1={ln.y1}
+            x2={ln.x2} y2={ln.y2}
+            stroke={lace_color}
+            strokeWidth="1.5"
+            opacity="0.85"
+          />
+        ))}
+
+        {/* PRESILLAS — placas horizontales (sólo para empresillada) */}
+        {!isCelosia && battens.map((by, i) => (
           <rect
             key={i}
             x={colCx - battenW_px / 2}
@@ -98,13 +138,15 @@ export default function SVGLateralView({ inputs }: SVGLateralViewProps) {
           />
         ))}
 
-        {/* Placa base y tope (presillas de extremo) */}
+        {/* Placa base y tope */}
         <rect x={colCx - battenW_px / 2} y={colTop - battenH_px}
           width={battenW_px} height={battenH_px}
-          fill={batten_color} fillOpacity="0.7" stroke={batten_color} strokeWidth="1" />
+          fill={isCelosia ? lace_color : batten_color} fillOpacity="0.7"
+          stroke={isCelosia ? lace_color : batten_color} strokeWidth="1" />
         <rect x={colCx - battenW_px / 2} y={colBot}
           width={battenW_px} height={battenH_px}
-          fill={batten_color} fillOpacity="0.7" stroke={batten_color} strokeWidth="1" />
+          fill={isCelosia ? lace_color : batten_color} fillOpacity="0.7"
+          stroke={isCelosia ? lace_color : batten_color} strokeWidth="1" />
 
         {/* Cota L */}
         <line x1={colCx + halfW + 14} y1={colTop} x2={colCx + halfW + 14} y2={colBot}
@@ -122,34 +164,44 @@ export default function SVGLateralView({ inputs }: SVGLateralViewProps) {
           L = {L.toFixed(1)} m
         </text>
 
-        {/* Cota 'a' (primera separación) */}
-        {battens.length > 0 && (
+        {/* Cota 'a' (primer panel) */}
+        {a_px > 10 && (
           <>
-            <line x1={colCx - halfW - 12} y1={colTop} x2={colCx - halfW - 12} y2={battens[0]}
+            <line x1={colCx - halfW - 12} y1={colTop} x2={colCx - halfW - 12} y2={colTop + a_px}
               stroke={dim} strokeWidth="0.8" strokeDasharray="2,2" />
             <line x1={colCx - halfW - 15} y1={colTop} x2={colCx - halfW - 9} y2={colTop}
               stroke={dim} strokeWidth="1" />
-            <line x1={colCx - halfW - 15} y1={battens[0]} x2={colCx - halfW - 9} y2={battens[0]}
+            <line x1={colCx - halfW - 15} y1={colTop + a_px} x2={colCx - halfW - 9} y2={colTop + a_px}
               stroke={dim} strokeWidth="1" />
             <text
               x={colCx - halfW - 18}
-              y={(colTop + battens[0]) / 2 + 3}
+              y={(colTop + colTop + a_px) / 2 + 3}
               textAnchor="middle"
               fill={dim} fontSize="8" fontFamily="JetBrains Mono, monospace"
-              transform={`rotate(-90, ${colCx - halfW - 18}, ${(colTop + battens[0]) / 2})`}
+              transform={`rotate(-90, ${colCx - halfW - 18}, ${(colTop + colTop + a_px) / 2})`}
             >
               a={a}mm
             </text>
           </>
         )}
 
-        {/* Etiquetas */}
-        <text x={colCx} y={colBot + 20} textAnchor="middle"
-          fill="#64748b" fontSize="8" fontFamily="JetBrains Mono, monospace">
-          {n_battens} presillas intermedias
-        </text>
+        {/* Ángulo θ para celosía */}
+        {isCelosia && lacing && (
+          <text x={colCx} y={colBot + 12} textAnchor="middle"
+            fill={lace_color} fontSize="8" fontFamily="JetBrains Mono, monospace">
+            θ={lacing.theta_deg.toFixed(1)}° · ld={lacing.l_d.toFixed(0)}mm
+          </text>
+        )}
 
-        {/* Empotramientos (condición de borde) */}
+        {/* Etiqueta para empresillada */}
+        {!isCelosia && (
+          <text x={colCx} y={colBot + 20} textAnchor="middle"
+            fill="#64748b" fontSize="8" fontFamily="JetBrains Mono, monospace">
+            {n_battens} presillas intermedias
+          </text>
+        )}
+
+        {/* Condición de borde */}
         <line x1={colCx - 16} y1={colTop} x2={colCx + 16} y2={colTop}
           stroke="#94a3b8" strokeWidth="2" />
         <line x1={colCx - 16} y1={colBot} x2={colCx + 16} y2={colBot}

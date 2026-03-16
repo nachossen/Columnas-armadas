@@ -142,7 +142,8 @@ export default function Dashboard({ results }: DashboardProps) {
     );
   }
 
-  const { section, slenderness, strength, battens, inputs } = results;
+  const { section, slenderness, strength, battens, lacing, inputs } = results;
+  const isCelosia = inputs.tipologia === 'celosia';
 
   return (
     <div className="flex-1 overflow-y-auto bg-grid p-4 space-y-4">
@@ -160,6 +161,9 @@ export default function Dashboard({ results }: DashboardProps) {
             {inputs.profile.designation} · L={inputs.L}m · {inputs.h_sep}mm back-to-back
           </div>
           <div className="text-xs text-slate-500 mono">
+            {isCelosia
+              ? `Celosía ${inputs.celosia_tipo ?? 'simple'} · ${inputs.angulo_lacing?.designation ?? '—'} · `
+              : ''}
             Fy={inputs.Fy}MPa · K={inputs.K} · a={inputs.a}mm ·{' '}
             {inputs.conexion === 'bulones' ? 'Bulones' : 'Soldadura'}
           </div>
@@ -213,7 +217,7 @@ export default function Dashboard({ results }: DashboardProps) {
         />
         <VerifCard
           title="Esbeltez Modificada"
-          subtitle="CIRSOC 301 §E.6 — Empresillada"
+          subtitle={`CIRSOC 301 §E.6 — ${isCelosia ? 'Celosía' : 'Empresillada'}`}
           value={slenderness.KLr_m.toFixed(2)}
           unit=""
           capacity={slenderness.limit_4_71.toFixed(1)}
@@ -250,17 +254,48 @@ export default function Dashboard({ results }: DashboardProps) {
           capacity={inputs.Fy.toString()}
           capUnit="MPa (Fy)"
         />
-        <VerifCard
-          title="Corte en Presillas"
-          subtitle="Vb por presilla — §E.6.2"
-          value={battens.Vb.toFixed(3)}
-          unit="kN"
-          capacity={battens.Mb.toFixed(4)}
-          capUnit="kNm (Mb)"
-        />
+
+        {/* Presillas — sólo para empresillada */}
+        {!isCelosia && (
+          <VerifCard
+            title="Corte en Presillas"
+            subtitle="Vb por presilla — §E.6.2"
+            value={battens.Vb.toFixed(3)}
+            unit="kN"
+            capacity={battens.Mb.toFixed(4)}
+            capUnit="kNm (Mb)"
+          />
+        )}
+
+        {/* Celosía — tarjetas específicas */}
+        {isCelosia && lacing && (
+          <>
+            <VerifCard
+              title="Barra de Celosía — Esbeltez"
+              subtitle={`§E.6.3c · KL/r ≤ 140 · ${inputs.angulo_lacing?.designation}`}
+              value={lacing.KLr_lacing.toFixed(2)}
+              unit=""
+              capacity="140"
+              capUnit="(límite)"
+              dcr={lacing.KLr_lacing / 140}
+              passes={lacing.passes_slenderness}
+              warning={!lacing.passes_slenderness}
+            />
+            <VerifCard
+              title="Barra de Celosía — Compresión"
+              subtitle={`φPn=${lacing.phi_Pn_lacing.toFixed(2)} kN · Nd=${lacing.N_d.toFixed(3)} kN`}
+              value={lacing.N_d.toFixed(3)}
+              unit="kN (Nd)"
+              capacity={lacing.phi_Pn_lacing.toFixed(2)}
+              capUnit="kN (φPn)"
+              dcr={lacing.DCR_lacing}
+              passes={lacing.passes_strength}
+            />
+          </>
+        )}
       </div>
 
-      {/* Detalles esbeltez */}
+      {/* Detalle de esbelteces */}
       <div className="bg-slate-900 border border-slate-800 rounded p-3">
         <div className="text-xs font-bold text-blue-400 uppercase tracking-wider mb-2">
           Detalle de Esbelteces
@@ -278,19 +313,41 @@ export default function Dashboard({ results }: DashboardProps) {
         </div>
       </div>
 
-      {/* Detalles presillas */}
-      <div className="bg-slate-900 border border-slate-800 rounded p-3">
-        <div className="text-xs font-bold text-blue-400 uppercase tracking-wider mb-2">
-          Diseño de Presillas
+      {/* Detalles presillas — sólo empresillada */}
+      {!isCelosia && (
+        <div className="bg-slate-900 border border-slate-800 rounded p-3">
+          <div className="text-xs font-bold text-blue-400 uppercase tracking-wider mb-2">
+            Diseño de Presillas
+          </div>
+          <div className="grid grid-cols-3 gap-1.5">
+            <PropCard label="V_diseño" value={battens.V_design.toFixed(2)} unit="kN" />
+            <PropCard label="h_0" value={battens.h_0.toFixed(0)} unit="mm" />
+            <PropCard label="N° presillas" value={battens.n_battens.toString()} unit="intermedias" />
+            <PropCard label="Vb" value={battens.Vb.toFixed(4)} unit="kN/presilla" />
+            <PropCard label="Mb" value={battens.Mb.toFixed(5)} unit="kNm/presilla" />
+          </div>
         </div>
-        <div className="grid grid-cols-3 gap-1.5">
-          <PropCard label="V_diseño" value={battens.V_design.toFixed(2)} unit="kN" />
-          <PropCard label="h_0" value={battens.h_0.toFixed(0)} unit="mm" />
-          <PropCard label="N° presillas" value={battens.n_battens.toString()} unit="intermedias" />
-          <PropCard label="Vb" value={battens.Vb.toFixed(4)} unit="kN/presilla" />
-          <PropCard label="Mb" value={battens.Mb.toFixed(5)} unit="kNm/presilla" />
+      )}
+
+      {/* Detalles celosía */}
+      {isCelosia && lacing && (
+        <div className="bg-slate-900 border border-slate-800 rounded p-3">
+          <div className="text-xs font-bold text-blue-400 uppercase tracking-wider mb-2">
+            Diseño de Barras de Celosía
+          </div>
+          <div className="grid grid-cols-3 gap-1.5">
+            <PropCard label="h_0" value={lacing.h_0.toFixed(0)} unit="mm" />
+            <PropCard label="θ" value={lacing.theta_deg.toFixed(1)} unit="°" />
+            <PropCard label="l_d" value={lacing.l_d.toFixed(1)} unit="mm" />
+            <PropCard label="KL_barra" value={lacing.KL_lacing.toFixed(1)} unit="mm" />
+            <PropCard label="r_min (iz)" value={lacing.r_lacing.toFixed(3)} unit="cm" />
+            <PropCard label="KL/r barra" value={lacing.KLr_lacing.toFixed(2)} unit="≤ 140" />
+            <PropCard label="N_d" value={lacing.N_d.toFixed(3)} unit="kN" />
+            <PropCard label="φPn barra" value={lacing.phi_Pn_lacing.toFixed(2)} unit="kN" />
+            <PropCard label="DCR barra" value={lacing.DCR_lacing.toFixed(3)} unit="" />
+          </div>
         </div>
-      </div>
+      )}
 
       {/* SVG visualizations */}
       <div className="grid grid-cols-2 gap-4">
@@ -298,7 +355,7 @@ export default function Dashboard({ results }: DashboardProps) {
           <SVGPlanView inputs={inputs} />
         </div>
         <div className="bg-slate-900 border border-slate-800 rounded p-3 flex justify-center">
-          <SVGLateralView inputs={inputs} />
+          <SVGLateralView inputs={inputs} lacing={lacing} />
         </div>
       </div>
     </div>

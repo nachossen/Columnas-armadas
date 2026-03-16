@@ -4,10 +4,12 @@ import { useState, useCallback } from 'react';
 import Sidebar from '@/components/Sidebar';
 import MainTabs from '@/components/MainTabs';
 import { UPN_CATALOG } from '@/data/upn_catalog';
+import { ANGULOS_CATALOG } from '@/data/angulos_catalog';
 import { calculate } from '@/lib/calculator';
 import type { ColumnInputs, CalculationResults } from '@/types';
 
 const DEFAULT_PROFILE = UPN_CATALOG.find(p => p.designation === 'UPN 200') ?? UPN_CATALOG[6];
+const DEFAULT_ANGULO = ANGULOS_CATALOG.find(p => p.designation === 'L 60×60×6') ?? ANGULOS_CATALOG[9];
 
 const DEFAULT_INPUTS: ColumnInputs = {
   tipologia: 'empresillada',
@@ -23,6 +25,9 @@ const DEFAULT_INPUTS: ColumnInputs = {
   Pu: 500,
   Vu: 10,
   Mu: 0,
+  // Celosía defaults
+  celosia_tipo: 'simple',
+  angulo_lacing: DEFAULT_ANGULO,
 };
 
 export default function Home() {

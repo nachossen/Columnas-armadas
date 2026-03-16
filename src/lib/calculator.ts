@@ -5,9 +5,11 @@
 
 import type { ColumnInputs, CalculationResults } from '@/types';
 import { BattenedColumnStrategy } from './strategies/BattenedColumnStrategy';
+import { LacedColumnStrategy } from './strategies/LacedColumnStrategy';
 
 const strategies = {
   empresillada: new BattenedColumnStrategy(),
+  celosia: new LacedColumnStrategy(),
 };
 
 export function calculate(inputs: ColumnInputs): CalculationResults {
@@ -23,6 +25,7 @@ export function calculate(inputs: ColumnInputs): CalculationResults {
       },
       strength: { Fe: 0, Fcr: 0, Pn: 0, phi_Pn: 0, phi_c: 0.85, DCR: 0, passes: false, buckling_mode: 'inelastic' },
       battens: { V_design: 0, h_0: 0, Vb: 0, Mb: 0, n_battens: 0, passes: false },
+      lacing: undefined,
       steps: [],
       errors: [`Tipología "${inputs.tipologia}" no implementada en esta versión`],
       warnings: [],
