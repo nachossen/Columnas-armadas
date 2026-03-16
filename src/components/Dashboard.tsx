@@ -142,8 +142,19 @@ export default function Dashboard({ results }: DashboardProps) {
     );
   }
 
-  const { section, slenderness, strength, battens, lacing, inputs } = results;
+  const { section, slenderness, strength, battens, lacing, contact, box, inputs } = results;
   const isCelosia = inputs.tipologia === 'celosia';
+  const isContacto = inputs.tipologia === 'perfiles_contacto';
+  const isCajonOrChapas = inputs.tipologia === 'cajón' || inputs.tipologia === 'chapas_continuas';
+  const isEmpresillada = inputs.tipologia === 'empresillada';
+  const hasConnectors = isContacto || isCelosia || isEmpresillada; // show individual slenderness
+  const tipologiaLabel: Record<string, string> = {
+    empresillada: 'Empresillada §E.6.2',
+    celosia: 'Celosía §E.6.3',
+    perfiles_contacto: 'En Contacto §E.6.1',
+    cajón: 'Cajón §E.6.4',
+    chapas_continuas: 'Chapas Continuas §E.6.5',
+  };
 
   return (
     <div className="flex-1 overflow-y-auto bg-grid p-4 space-y-4">
@@ -161,11 +172,12 @@ export default function Dashboard({ results }: DashboardProps) {
             {inputs.profile.designation} · L={inputs.L}m · {inputs.h_sep}mm back-to-back
           </div>
           <div className="text-xs text-slate-500 mono">
-            {isCelosia
-              ? `Celosía ${inputs.celosia_tipo ?? 'simple'} · ${inputs.angulo_lacing?.designation ?? '—'} · `
-              : ''}
-            Fy={inputs.Fy}MPa · K={inputs.K} · a={inputs.a}mm ·{' '}
-            {inputs.conexion === 'bulones' ? 'Bulones' : 'Soldadura'}
+            {tipologiaLabel[inputs.tipologia]} ·{' '}
+            {isCelosia ? `${inputs.angulo_lacing?.designation ?? '—'} · ` : ''}
+            {isContacto ? `${inputs.angulo_contacto?.designation ?? '—'} · ` : ''}
+            {isCajonOrChapas ? `t_cp=${inputs.t_cp ?? '—'}mm · ` : ''}
+            Fy={inputs.Fy}MPa · K={inputs.K}
+            {!isCajonOrChapas ? ` · a=${inputs.a}mm · ${inputs.conexion === 'bulones' ? 'Bulones' : 'Soldadura'}` : ' · Soldadura continua'}
           </div>
         </div>
         <div className="text-2xl font-black tracking-wider">
@@ -217,7 +229,7 @@ export default function Dashboard({ results }: DashboardProps) {
         />
         <VerifCard
           title="Esbeltez Modificada"
-          subtitle={`CIRSOC 301 §E.6 — ${isCelosia ? 'Celosía' : 'Empresillada'}`}
+          subtitle={`CIRSOC 301 §E.6 — ${tipologiaLabel[inputs.tipologia]}`}
           value={slenderness.KLr_m.toFixed(2)}
           unit=""
           capacity={slenderness.limit_4_71.toFixed(1)}
@@ -225,17 +237,20 @@ export default function Dashboard({ results }: DashboardProps) {
           dcr={slenderness.KLr_m / slenderness.limit_200}
           passes={slenderness.check_modified}
         />
-        <VerifCard
-          title="Esbeltez Individual"
-          subtitle="a/ri ≤ 0.75·(KL/r)_m"
-          value={slenderness.a_ri.toFixed(2)}
-          unit=""
-          capacity={(0.75 * slenderness.KLr_m).toFixed(2)}
-          capUnit="(límite)"
-          dcr={slenderness.a_ri / (0.75 * slenderness.KLr_m)}
-          passes={slenderness.check_individual}
-          warning={!slenderness.check_individual}
-        />
+        {/* Esbeltez individual — sólo para tipologías con conectores discretos */}
+        {!isCajonOrChapas && (
+          <VerifCard
+            title="Esbeltez Individual"
+            subtitle={isContacto ? 'a/ri ≤ 0.75·(KL/r)_m — conectores' : 'a/ri ≤ 0.75·(KL/r)_m'}
+            value={slenderness.a_ri.toFixed(2)}
+            unit=""
+            capacity={(0.75 * slenderness.KLr_m).toFixed(2)}
+            capUnit="(límite)"
+            dcr={slenderness.a_ri > 0 ? slenderness.a_ri / Math.max(0.75 * slenderness.KLr_m, 0.001) : 0}
+            passes={slenderness.check_individual}
+            warning={!slenderness.check_individual}
+          />
+        )}
         <VerifCard
           title="Verificación Compresión"
           subtitle={`φcPn = 0.85×${strength.Pn.toFixed(1)} kN`}
@@ -256,7 +271,7 @@ export default function Dashboard({ results }: DashboardProps) {
         />
 
         {/* Presillas — sólo para empresillada */}
-        {!isCelosia && (
+        {isEmpresillada && (
           <VerifCard
             title="Corte en Presillas"
             subtitle="Vb por presilla — §E.6.2"
@@ -264,6 +279,30 @@ export default function Dashboard({ results }: DashboardProps) {
             unit="kN"
             capacity={battens.Mb.toFixed(4)}
             capUnit="kNm (Mb)"
+          />
+        )}
+
+        {/* Perfiles en contacto — conectores */}
+        {isContacto && contact && (
+          <VerifCard
+            title="Conectores — Perfiles en Contacto"
+            subtitle={`§E.6.1 · ${contact.n_connectors} juegos · h_0=${contact.h_0.toFixed(0)}mm`}
+            value={contact.V_design.toFixed(2)}
+            unit="kN (V_diseño)"
+            passes={contact.passes}
+          />
+        )}
+
+        {/* Cajón / Chapas — info de chapas */}
+        {isCajonOrChapas && box && (
+          <VerifCard
+            title={inputs.tipologia === 'cajón' ? 'Chapas de Cubierta (Cajón)' : 'Chapas Laterales Continuas'}
+            subtitle={`§${inputs.tipologia === 'cajón' ? 'E.6.4' : 'E.6.5'} · t_cp=${box.t_cp}mm · soldadura continua`}
+            value={box.A_plates.toFixed(2)}
+            unit="cm² (A_chapas total)"
+            capacity={`b=${box.b_total.toFixed(0)}`}
+            capUnit="mm"
+            passes={box.passes}
           />
         )}
 
@@ -314,7 +353,7 @@ export default function Dashboard({ results }: DashboardProps) {
       </div>
 
       {/* Detalles presillas — sólo empresillada */}
-      {!isCelosia && (
+      {isEmpresillada && (
         <div className="bg-slate-900 border border-slate-800 rounded p-3">
           <div className="text-xs font-bold text-blue-400 uppercase tracking-wider mb-2">
             Diseño de Presillas
@@ -325,6 +364,34 @@ export default function Dashboard({ results }: DashboardProps) {
             <PropCard label="N° presillas" value={battens.n_battens.toString()} unit="intermedias" />
             <PropCard label="Vb" value={battens.Vb.toFixed(4)} unit="kN/presilla" />
             <PropCard label="Mb" value={battens.Mb.toFixed(5)} unit="kNm/presilla" />
+          </div>
+        </div>
+      )}
+
+      {/* Detalles conectores — perfiles en contacto */}
+      {isContacto && contact && (
+        <div className="bg-slate-900 border border-slate-800 rounded p-3">
+          <div className="text-xs font-bold text-blue-400 uppercase tracking-wider mb-2">
+            Diseño de Conectores — §E.6.1
+          </div>
+          <div className="grid grid-cols-3 gap-1.5">
+            <PropCard label="V_diseño" value={contact.V_design.toFixed(2)} unit="kN" />
+            <PropCard label="h_0" value={contact.h_0.toFixed(0)} unit="mm" />
+            <PropCard label="N° juegos" value={contact.n_connectors.toString()} unit="conectores" />
+          </div>
+        </div>
+      )}
+
+      {/* Detalles chapas — cajón/chapas continuas */}
+      {isCajonOrChapas && box && (
+        <div className="bg-slate-900 border border-slate-800 rounded p-3">
+          <div className="text-xs font-bold text-blue-400 uppercase tracking-wider mb-2">
+            {inputs.tipologia === 'cajón' ? 'Chapas de Cubierta — §E.6.4' : 'Chapas Continuas Laterales — §E.6.5'}
+          </div>
+          <div className="grid grid-cols-3 gap-1.5">
+            <PropCard label="b_total" value={box.b_total.toFixed(0)} unit="mm" />
+            <PropCard label="A_chapas" value={box.A_plates.toFixed(2)} unit="cm²" />
+            <PropCard label="t_cp" value={box.t_cp.toFixed(0)} unit="mm" />
           </div>
         </div>
       )}

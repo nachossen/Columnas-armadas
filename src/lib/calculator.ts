@@ -6,10 +6,16 @@
 import type { ColumnInputs, CalculationResults } from '@/types';
 import { BattenedColumnStrategy } from './strategies/BattenedColumnStrategy';
 import { LacedColumnStrategy } from './strategies/LacedColumnStrategy';
+import { ContactColumnStrategy } from './strategies/ContactColumnStrategy';
+import { BoxColumnStrategy } from './strategies/BoxColumnStrategy';
+import { CoverPlateColumnStrategy } from './strategies/CoverPlateColumnStrategy';
 
 const strategies = {
   empresillada: new BattenedColumnStrategy(),
   celosia: new LacedColumnStrategy(),
+  perfiles_contacto: new ContactColumnStrategy(),
+  cajón: new BoxColumnStrategy(),
+  chapas_continuas: new CoverPlateColumnStrategy(),
 };
 
 export function calculate(inputs: ColumnInputs): CalculationResults {

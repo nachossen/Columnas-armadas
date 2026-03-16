@@ -71,10 +71,44 @@ function CalcStep({ step, index }: { step: CalculationStep; index: number }) {
 }
 
 // ── Encabezado de la memoria ──────────────────────────────────────────────────
+const TIPOLOGIA_TITLE: Record<string, { label: string; articulo: string; grupo: string }> = {
+  empresillada:      { label: 'Columna Empresillada',               articulo: '§E.6.2', grupo: 'Grupo V' },
+  celosia:           { label: 'Columna de Celosía',                  articulo: '§E.6.3', grupo: 'Grupo IV' },
+  perfiles_contacto: { label: 'Doble Ángulo en Contacto (2L)',        articulo: '§E.6.1', grupo: 'Grupo I' },
+  cajón:             { label: 'Columna Cajón (Box Section)',           articulo: '§E.6.4', grupo: 'Grupo III' },
+  chapas_continuas:  { label: 'Columna con Chapas Continuas Laterales', articulo: '§E.6.5', grupo: 'Grupo II' },
+};
+
 function MemoriaHeader({ results }: { results: CalculationResults }) {
   const today = new Date().toLocaleDateString('es-AR', {
     day: '2-digit', month: '2-digit', year: 'numeric',
   });
+  const { inputs } = results;
+  const tipInfo = TIPOLOGIA_TITLE[inputs.tipologia] ?? { label: inputs.tipologia, articulo: '§E.6', grupo: '' };
+  const isContacto = inputs.tipologia === 'perfiles_contacto';
+  const isCajonOrChapas = inputs.tipologia === 'cajón' || inputs.tipologia === 'chapas_continuas';
+
+  // Build input rows dynamically per typology
+  const inputRows: [string, string][] = [
+    isContacto
+      ? ['Ángulo (2L)', inputs.angulo_contacto?.designation ?? '—']
+      : ['Perfil UPN', inputs.profile.designation],
+    ['Longitud L', `${inputs.L} m`],
+    ['Sep. back-to-back', `${inputs.h_sep} mm`],
+    ...(!isCajonOrChapas ? [['Sep. conectores a', `${inputs.a} mm`] as [string, string]] : []),
+    ...(isCajonOrChapas ? [['Espesor chapas t_cp', `${inputs.t_cp ?? '—'} mm`] as [string, string]] : []),
+    ...(inputs.tipologia === 'celosia' ? [
+      ['Barra celosía', inputs.angulo_lacing?.designation ?? '—'] as [string, string],
+      ['Tipo celosía', inputs.celosia_tipo ?? 'simple'] as [string, string],
+    ] : []),
+    ['Factor K', inputs.K.toString()],
+    ['Conexión', isCajonOrChapas ? 'Soldadura continua' : inputs.conexion === 'bulones' ? 'Bulones' : 'Soldadura'],
+    ['Fy', `${inputs.Fy} MPa`],
+    ['E', `${inputs.E.toLocaleString()} MPa`],
+    ['Pu', `${inputs.Pu} kN`],
+    ['Vu', `${inputs.Vu} kN`],
+    ['Mu', `${inputs.Mu} kNm`],
+  ];
 
   return (
     <div className="border-b-2 border-slate-800 pb-4 mb-6">
@@ -87,32 +121,25 @@ function MemoriaHeader({ results }: { results: CalculationResults }) {
             Memoria de Cálculo
           </h1>
           <h2 className="text-lg font-bold text-blue-700">
-            Columna Empresillada — Sección Compuesta con {results.inputs.profile.designation}
+            {tipInfo.label} — {isContacto
+              ? (inputs.angulo_contacto?.designation ?? '—')
+              : inputs.profile.designation}
           </h2>
+          <div className="text-xs text-slate-500 mono mt-1">
+            {tipInfo.grupo} · CIRSOC 301-2018 {tipInfo.articulo}
+          </div>
         </div>
         <div className="text-right">
           <div className="text-xs text-slate-500">Normativa</div>
           <div className="font-bold text-slate-800 text-sm">CIRSOC 301-2018</div>
-          <div className="text-xs text-slate-500 mono">AISC 360-16 §E.6</div>
+          <div className="text-xs text-slate-500 mono">AISC 360-16 {tipInfo.articulo}</div>
           <div className="text-xs text-slate-500 mt-2">Fecha: {today}</div>
         </div>
       </div>
 
       {/* Cuadro de datos */}
       <div className="mt-4 grid grid-cols-4 gap-3">
-        {[
-          ['Perfil', results.inputs.profile.designation],
-          ['Longitud L', `${results.inputs.L} m`],
-          ['Sep. back-to-back', `${results.inputs.h_sep} mm`],
-          ['Sep. presillas a', `${results.inputs.a} mm`],
-          ['Factor K', results.inputs.K.toString()],
-          ['Conexión', results.inputs.conexion === 'bulones' ? 'Bulones' : 'Soldadura'],
-          ['Fy', `${results.inputs.Fy} MPa`],
-          ['E', `${results.inputs.E.toLocaleString()} MPa`],
-          ['Pu', `${results.inputs.Pu} kN`],
-          ['Vu', `${results.inputs.Vu} kN`],
-          ['Mu', `${results.inputs.Mu} kNm`],
-        ].map(([k, v]) => (
+        {inputRows.map(([k, v]) => (
           <div key={k} className="bg-slate-100 rounded p-2">
             <div className="text-xs text-slate-500">{k}</div>
             <div className="font-bold text-slate-800 mono text-sm">{v}</div>
@@ -414,6 +441,30 @@ export default function MemoriaCalculo({ results }: MemoriaProps) {
   }
 
   const { section, slenderness, strength, battens, inputs } = results;
+  const isContacto = inputs.tipologia === 'perfiles_contacto';
+
+  // Build profile table rows depending on typology
+  const profileRows: [string, string, string][] = isContacto && inputs.angulo_contacto
+    ? [
+        ['Área A (c/u)', inputs.angulo_contacto.A.toFixed(2), 'cm²'],
+        ['Inercia eje mayor Iy', inputs.angulo_contacto.Iy.toFixed(1), 'cm⁴'],
+        ['Inercia eje menor Iz', inputs.angulo_contacto.Iz.toFixed(1), 'cm⁴'],
+        ['Radio de giro mayor iy', inputs.angulo_contacto.iy.toFixed(2), 'cm'],
+        ['Radio de giro menor iz (i_min)', inputs.angulo_contacto.iz.toFixed(2), 'cm'],
+        ['Dist. centroide → cara exterior e', inputs.angulo_contacto.e.toFixed(2), 'cm'],
+      ]
+    : [
+        ['Altura h', inputs.profile.h.toString(), 'mm'],
+        ['Ancho de ala b', inputs.profile.b.toString(), 'mm'],
+        ['Espesor de alma tw', inputs.profile.tw.toString(), 'mm'],
+        ['Espesor de ala tf', inputs.profile.tf.toString(), 'mm'],
+        ['Área A', inputs.profile.A.toFixed(2), 'cm²'],
+        ['Inercia eje fuerte Iy', inputs.profile.Iy.toFixed(1), 'cm⁴'],
+        ['Inercia eje débil Iz', inputs.profile.Iz.toFixed(1), 'cm⁴'],
+        ['Radio de giro eje fuerte iy', inputs.profile.iy.toFixed(2), 'cm'],
+        ['Radio de giro eje débil iz', inputs.profile.iz.toFixed(2), 'cm'],
+        ['Dist. centroide → alma exterior ys', inputs.profile.ys.toFixed(2), 'cm'],
+      ];
 
   return (
     <div className="flex-1 overflow-y-auto memoria-paper p-8">
@@ -422,19 +473,8 @@ export default function MemoriaCalculo({ results }: MemoriaProps) {
 
         {/* Propiedades del perfil individual */}
         <PropTable
-          title={`Propiedades del Perfil Individual — ${inputs.profile.designation}`}
-          rows={[
-            ['Altura h', inputs.profile.h.toString(), 'mm'],
-            ['Ancho de ala b', inputs.profile.b.toString(), 'mm'],
-            ['Espesor de alma tw', inputs.profile.tw.toString(), 'mm'],
-            ['Espesor de ala tf', inputs.profile.tf.toString(), 'mm'],
-            ['Área A', inputs.profile.A.toFixed(2), 'cm²'],
-            ['Inercia eje fuerte Iy', inputs.profile.Iy.toFixed(1), 'cm⁴'],
-            ['Inercia eje débil Iz', inputs.profile.Iz.toFixed(1), 'cm⁴'],
-            ['Radio de giro eje fuerte iy', inputs.profile.iy.toFixed(2), 'cm'],
-            ['Radio de giro eje débil iz', inputs.profile.iz.toFixed(2), 'cm'],
-            ['Dist. centroide → alma exterior ys', inputs.profile.ys.toFixed(2), 'cm'],
-          ]}
+          title={`Propiedades del Perfil Individual — ${isContacto ? (inputs.angulo_contacto?.designation ?? '—') : inputs.profile.designation}`}
+          rows={profileRows}
         />
 
         {/* Pasos de cálculo */}
@@ -497,8 +537,8 @@ export default function MemoriaCalculo({ results }: MemoriaProps) {
           </table>
         </div>
 
-        {/* Informe de auditoría */}
-        <AuditReport results={results} />
+        {/* Informe de auditoría — sólo para empresillada (tiene caso canónico de referencia) */}
+        {inputs.tipologia === 'empresillada' && <AuditReport results={results} />}
 
         {/* Pie de página */}
         <div className="mt-8 pt-4 border-t border-slate-200 text-xs text-slate-400 text-center">
@@ -506,7 +546,7 @@ export default function MemoriaCalculo({ results }: MemoriaProps) {
             Sistema Integral de Cálculo — Columnas Armadas | CIRSOC 301-2018 / AISC 360-16
           </div>
           <div className="mono mt-0.5">
-            Fase 1: Columnas Empresilladas con Perfiles UPN · φc = 0.85 (CIRSOC)
+            {TIPOLOGIA_TITLE[inputs.tipologia]?.grupo ?? ''} — {TIPOLOGIA_TITLE[inputs.tipologia]?.label ?? ''} · φc = 0.85 (CIRSOC)
           </div>
         </div>
       </div>
